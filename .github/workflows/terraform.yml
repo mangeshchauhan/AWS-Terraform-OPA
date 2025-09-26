@@ -44,3 +44,4 @@ jobs:
       - name: Terraform Apply
         if: success()
         run: terraform apply -auto-approve tfplan
+
