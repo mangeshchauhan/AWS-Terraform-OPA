@@ -70,8 +70,6 @@ jobs:
       - name: Approval before Apply
         if: success()
         uses: hmarr/auto-approve-action@v2
-        with:
-          message: "Terraform plan ready. Waiting for manual approval to apply."
 
       - name: Terraform Apply
         if: success()
