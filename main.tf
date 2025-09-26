@@ -1,6 +1,7 @@
 provider "aws" {
   region = "ap-south-1"
 }
+
 terraform {
   backend "s3" {
     bucket         = "my-terraform-state-bucket-12345678901234"
@@ -9,9 +10,6 @@ terraform {
     
   }
 }
-
-
-
 module "vpc" {
   source         = "./modules/vpc"
   vpc_cidr       = "10.0.0.0/16"
