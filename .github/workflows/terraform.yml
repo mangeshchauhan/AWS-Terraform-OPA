@@ -12,7 +12,7 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ap-south-1  # Change as needed
+      AWS_REGION: ap-south-1  # Change to your AWS region
 
     steps:
       - name: Checkout code
@@ -21,37 +21,38 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.7.0  # Set your desired Terraform version
+          terraform_version: 1.6.0  # specify your desired version
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Plan (binary)
         run: |
-          terraform plan -out=myplan
-          echo "Terraform plan completed successfully."
+          terraform plan -out="0myplan.tfplan"
+          echo "Terraform plan created successfully."
 
       - name: Export Plan to JSON
         run: |
-          # Export terraform plan to JSON, if plan is empty use '{}'
-          terraform show -json myplan > myplan.json || echo '{}' > myplan.json
-          echo "myplan.json created."
-
-      - name: Validate Plan JSON
-        run: |
-          if [ ! -s myplan.json ]; then
-            echo "No changes detected. Skipping further steps."
-            exit 0
+          # Safely export plan to JSON; create empty JSON if plan has no changes
+          if terraform show -json myplan.tfplan > myplan.json 2>/dev/null; then
+            echo "myplan.json created."
+          else
+            echo "{}" > myplan.json
+            echo "Plan was empty. Created empty JSON file."
           fi
 
+      - name: Validate myplan.json
+        run: |
+          # Check JSON validity
           if ! jq empty myplan.json >/dev/null 2>&1; then
             echo "Error: myplan.json is not valid JSON!"
             head -10 myplan.json
             exit 1
           fi
 
+          # Check if plan has resource changes
           if [ "$(jq '.resource_changes | length' myplan.json)" -eq 0 ]; then
-            echo "Terraform plan has no changes. Skipping apply."
+            echo "Terraform plan has no changes. Skipping further steps."
             exit 0
           fi
 
@@ -67,12 +68,11 @@ jobs:
       - name: Run OPA Policies
         run: conftest test myplan.json --policy opa-policies/
 
-      - name: Request Manual Approval
+      - name: Await Manual Approval
         uses: hmarr/auto-approve-action@v2
+        if: success()
         with:
-          message: "Terraform plan ready for apply. Manual approval required before execution."
-        if: success()
-
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Terraform Apply
-        if: success()
+        if: success()  # Only apply if previous steps succeed
         run: terraform apply -auto-approve myplan
