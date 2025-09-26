@@ -26,26 +26,26 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          terraform plan -out="tfplan"
+          terraform plan -out="myplan.tfplan"
           echo "Terraform plan created successfully."
 
       - name: Export Plan to JSON
-        run: terraform show -json tfplan > tfplan.json
+        run: terraform show -json myplan.tfplan > mplan.json
 
       - name: Validate tfplan.json using jq
         run: |
-          if [ ! -s tfplan.json ]; then
-            echo "Error: tfplan.json is empty!"
+          if [ ! -s myplan.json ]; then
+            echo "Error: myplan.json is empty!"
             exit 1
           fi
 
-          if ! jq empty tfplan.json >/dev/null 2>&1; then
-            echo "Error: tfplan.json is not valid JSON!"
-            head -10 tfplan.json
+          if ! jq empty myplan.json >/dev/null 2>&1; then
+            echo "Error: myplan.json is not valid JSON!"
+            head -10 myplan.json
             exit 1
           fi
 
-          echo "tfplan.json is valid JSON."
+          echo "myplan.json is valid JSON."
 
       - name: Install Conftest
         run: |
@@ -55,7 +55,7 @@ jobs:
           conftest --help
 
       - name: Run OPA Policies
-        run: conftest test tfplan.json --policy opa-policies/
+        run: conftest test myplan.json --policy opa-policies/
 
       - name: Wait for Manual Approval
         uses: hmarr/auto-approve-action@v2
