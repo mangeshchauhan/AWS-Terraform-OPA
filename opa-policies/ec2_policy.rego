@@ -1,18 +1,20 @@
 package terraform.ec2
 
-# List of required tags
+# Required tags for all AWS EC2 resources
 required_tags := {"Environment", "Department"}
 
-# Deny if any required tag is missing
 deny[msg] {
-    input.resource_type == "aws_instance"
-    
+    input.resource_changes[_].type == "aws_instance"
+
+    # get the current resource object
+    resource := input.resource_changes[_]
+
     # iterate over required tags
-    some rtag
-    rtag := required_tags[_]
+    some t
+    t := required_tags[_]
 
-    # check if input tags are missing
-    not input.tags[rtag]
+    # check if the tag is missing
+    not resource.change.after.tags[t]
 
-    msg = sprintf("EC2 instance '%s' is missing required tag: %s", [input.resource_name, rtag])
+    msg = sprintf("EC2 '%s' is missing required tag: %s", [resource.address, t])
 }
