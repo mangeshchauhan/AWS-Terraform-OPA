@@ -59,6 +59,10 @@ jobs:
           sudo mv conftest /usr/local/bin/
           conftest --version
 
+      - name: Download OPA policies from S3
+        run: |
+          aws s3 cp s3://my-terraform-state-bucket-12345678901234/opa-policies/ ./opa-policies/ --recursive
+
       - name: Run OPA Policies
         run: conftest test myplan.json --policy ./opa-policies/
        
