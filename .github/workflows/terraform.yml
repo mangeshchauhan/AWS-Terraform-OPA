@@ -12,7 +12,7 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: us-east-1  # Change as needed
+      AWS_REGION: us-east-1   # Change to your AWS region
 
     steps:
       - name: Checkout code
@@ -41,22 +41,22 @@ jobs:
           file tfplan
 
       - name: Export Plan to JSON
-        run: |
-          terraform show -json tfplan > tfplan.json
-          echo "JSON plan exported."
+        run: terraform show -json tfplan > tfplan.json
 
-      - name: Validate tfplan.json
+      - name: Validate tfplan.json using jq
         run: |
           if [ ! -s tfplan.json ]; then
             echo "Error: tfplan.json is empty!"
             exit 1
           fi
-          FIRST_CHAR=$(head -c 1 tfplan.json)
-          if [ "$FIRST_CHAR" != "{" ]; then
-            echo "Error: tfplan.json is not valid JSON! First char: $FIRST_CHAR"
+
+          # Check valid JSON
+          if ! jq empty tfplan.json 2>/dev/null; then
+            echo "Error: tfplan.json is not valid JSON!"
             head -10 tfplan.json
             exit 1
           fi
+
           echo "tfplan.json is valid JSON."
 
       - name: Install Conftest
@@ -70,5 +70,5 @@ jobs:
         run: conftest test tfplan.json --policy opa-policies/
 
       - name: Terraform Apply
-        if: success()  # Only apply if OPA tests pass
+        if: success()   # Only apply if OPA tests pass
         run: terraform apply -auto-approve tfplan
