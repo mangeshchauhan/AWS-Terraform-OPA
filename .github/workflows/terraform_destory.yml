@@ -1,0 +1,52 @@
+name: Terraform Destroy Infrastructure
+
+on:
+  workflow_dispatch:  # Trigger manually from GitHub UI
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ap-south-1  # Change to your region
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.0  # Your Terraform version
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=bucket=my-terraform-state-bucket-12345678901234" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="region=ap-south-1" \
+
+      - name: Terraform Plan Destroy
+        run: |
+          terraform plan -destroy -out=destroy.tfplan
+          echo "Terraform destroy plan created."
+
+      - name: Validate destroy plan
+        run: |
+          terraform show -json destroy.tfplan > destroy.json
+          if ! jq empty destroy.json >/dev/null 2>&1; then
+            echo "Error: destroy plan JSON is invalid!"
+            head -10 destroy.json
+            exit 1
+          fi
+          echo "Destroy plan is valid JSON."
+
+      - name: Approval before destroy
+        uses: hmarr/auto-approve-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve destroy.tfplan
