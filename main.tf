@@ -22,7 +22,7 @@ module "ec2" {
   ami_id         = "ami-018046b953a698135" # Update with latest Amazon Linux or Ubuntu
   instance_type  = "t2.micro"
   subnet_id      = module.vpc.public_subnet_ids[0]
-  sg_id          = module.sg.security_group.main.id
+  sg_id          = module.sg.aws_security_group.main.id
   key_name       = "ec2" # Your EC2 KeyPair
   instance_name  = "wordpress-ec2"
 }
