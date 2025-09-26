@@ -11,11 +11,11 @@ module "vpc" {
   azs            = ["ap-south-1a", "ap-south-1b"]
 }
 
-/*module "sg" {
+module "sg" {
   source  = "../../modules/security_groups"
   vpc_id  = module.vpc.vpc_id
   sg_name = "wordpress-sg"
-}*/
+}
 
 module "ec2" {
   source         = "./modules/ec2"
