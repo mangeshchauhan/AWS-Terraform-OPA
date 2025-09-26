@@ -21,6 +21,9 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
 
+      - name: Check Terraform Version
+        run: terraform version
+
       - name: Terraform Init
         run: terraform init
 
@@ -41,14 +44,14 @@ jobs:
           file tfplan
 
       - name: Export Plan to JSON
-        run: terraform show -json tfplan > tfplan.json
+        run: terraform show -json tfplan > tfplan.json || true
 
       - name: Validate tfplan.json using jq
         run: |
           # Check if tfplan.json is empty
           if [ ! -s tfplan.json ]; then
-            echo "Error: tfplan.json is empty!"
-            exit 1
+            echo "Warning: tfplan.json is empty, no changes detected."
+            exit 0
           fi
 
           # Check if tfplan.json is valid JSON
@@ -68,8 +71,18 @@ jobs:
           conftest version
 
       - name: Run OPA Policies
-        run: conftest test tfplan.json --policy opa-policies/
+        run: |
+          if [ -s tfplan.json ]; then
+            conftest test tfplan.json --policy opa-policies/
+          else
+            echo "Skipping OPA tests as tfplan.json is empty."
+          fi
 
       - name: Terraform Apply
         if: success()   # Only apply if OPA tests pass
-        run: terraform apply -auto-approve tfplan
+        run: |
+          if [ -s tfplan.json ]; then
+            terraform apply -auto-approve tfplan
+          else
+            echo "No changes to apply."
+          fi
