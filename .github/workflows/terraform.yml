@@ -40,34 +40,6 @@ jobs:
           ls -l tfplan
           file tfplan
 
-      - name: Export Plan to JSON
-        run: |
-          # Export terraform plan to JSON, allow command to fail
-          terraform show -json tfplan > tfplan.json || echo '{}' > tfplan.json
-          echo "tfplan.json created (empty JSON if plan had no changes)."
-
-      - name: Validate tfplan.json using jq
-        run: |
-          if [ ! -f tfplan.json ]; then
-            echo "Error: tfplan.json not found!"
-            exit 1
-          fi
-
-          # Check if tfplan.json is valid JSON
-          if ! jq empty tfplan.json 2>/dev/null; then
-            echo "Error: tfplan.json is not valid JSON!"
-            head -10 tfplan.json
-            exit 1
-          fi
-
-          # Check if tfplan.json has resource changes
-          if [ "$(jq '.resource_changes | length' tfplan.json)" -eq 0 ]; then
-            echo "tfplan.json has no changes. Skipping apply."
-            exit 0
-          fi
-
-          echo "tfplan.json is valid and has changes."
-
       - name: Install Conftest
         run: |
           wget https://github.com/open-policy-agent/conftest/releases/download/v0.37.0/conftest_0.37.0_Linux_x86_64.tar.gz
@@ -75,9 +47,20 @@ jobs:
           sudo mv conftest /usr/local/bin/
           conftest version
 
-      - name: Run OPA Policies
-        run: conftest test tfplan.json --policy opa-policies/
+      - name: Run OPA Policies on Terraform Plan
+        run: |
+          terraform show tfplan > tfplan.txt
+          conftest test tfplan.txt --policy opa-policies/
+
+  apply:
+    needs: terraform
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      # Add reviewers in GitHub repository settings for this environment
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Terraform Apply
-        if: success()   # Only apply if OPA tests pass
         run: terraform apply -auto-approve tfplan
