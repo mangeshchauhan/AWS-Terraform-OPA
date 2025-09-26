@@ -5,7 +5,7 @@ deny[msg] {
     required_tags := {"Name", "Environment", "Department"}
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
-    not "delete" in resource.change.actions
+    not contains(resource.change.actions, "delete")
 
     tag := required_tags[_]
     not resource.change.after.tags[tag]
@@ -16,7 +16,7 @@ deny[msg] {
 deny[msg] {
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
-    "update" in resource.change.actions
+    contains(resource.change.actions, "update")
 
     before := resource.change.before.instance_type
     after := resource.change.after.instance_type
@@ -29,11 +29,17 @@ deny[msg] {
 deny[msg] {
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
-    "replace" in resource.change.actions
+    contains(resource.change.actions, "replace")
 
     before := resource.change.before.instance_type
     after := resource.change.after.instance_type
 
     before != after
     msg := sprintf("EC2 %s is being replaced: instance type %s -> %s", [resource.address, before, after])
+}
+
+# Helper function
+contains(arr, val) {
+    some i
+    arr[i] == val
 }
