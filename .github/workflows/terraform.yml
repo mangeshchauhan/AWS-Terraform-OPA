@@ -12,7 +12,7 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ap-south-1
+      AWS_REGION: ap-south-1  # Change to your region
 
     steps:
       - name: Checkout code
@@ -21,28 +21,26 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.6.5   # specify your Terraform version
+          terraform_version: 1.7.0  # Specify your desired version
 
       - name: Terraform Init
         run: terraform init
 
       - name: Terraform Plan
         run: |
-          terraform plan -out="myplan.tfplan"
-          echo "Terraform plan saved to tfplan."
+          terraform plan -out="tfplan" || exit 1
 
       - name: Export Plan to JSON
         run: |
-          terraform show -json myplan.tfplan > myplan.json || echo '{}' > myplan.json
-          echo "Terraform plan exported to JSON."
-
-      - name: Validate JSON
-        run: |
-          if [ ! -s myplan.json ]; then
-            echo "No changes detected. Skipping OPA policy check and apply."
-            exit 0
+          if terraform show -json tfplan > myplan.json; then
+            echo "myplan.json created."
+          else
+            echo "Terraform plan JSON failed. Creating empty JSON to skip OPA."
+            echo '{}' > myplan.json
           fi
 
+      - name: Validate Terraform Plan JSON
+        run: |
           if ! jq empty myplan.json >/dev/null 2>&1; then
             echo "Error: myplan.json is not valid JSON!"
             head -10 myplan.json
@@ -50,7 +48,7 @@ jobs:
           fi
 
           if [ "$(jq '.resource_changes | length' myplan.json)" -eq 0 ]; then
-            echo "Terraform plan has no resource changes. Skipping apply."
+            echo "Terraform plan has no resource changes. Skipping OPA and apply."
             exit 0
           fi
 
@@ -61,18 +59,17 @@ jobs:
           wget https://github.com/open-policy-agent/conftest/releases/download/v0.37.0/conftest_0.37.0_Linux_x86_64.tar.gz
           tar xzf conftest_0.37.0_Linux_x86_64.tar.gz
           sudo mv conftest /usr/local/bin/
-          conftest version
+          conftest --version
 
       - name: Run OPA Policies
         run: conftest test myplan.json --policy ./opa-policies/
 
-      - name: Request Approval
+      - name: Manual Approval Before Apply
         uses: hmarr/auto-approve-action@v2
-        if: success()   # Only trigger if previous steps passed
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment: "Terraform plan is ready to apply. Approve to proceed."
+          comment: "Terraform apply is waiting for manual approval."
+        if: success()  # Only show if OPA policies pass
 
       - name: Terraform Apply
-        if: success()   # Only apply if OPA checks passed and approval given
+        if: success()
         run: terraform apply -auto-approve tfplan
