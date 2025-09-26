@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 module "vpc" {
-  source         = "../../modules/vpc"
+  source         = "./modules/vpc"
   vpc_cidr       = "10.0.0.0/16"
   vpc_name       = "test-vpc"
   public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
@@ -11,14 +11,14 @@ module "vpc" {
   azs            = ["ap-south-1a", "ap-south-1b"]
 }
 
-module "sg" {
+/*module "sg" {
   source  = "../../modules/security_groups"
   vpc_id  = module.vpc.vpc_id
   sg_name = "wordpress-sg"
-}
+}*/
 
 module "ec2" {
-  source         = "../../modules/ec2"
+  source         = "./modules/ec2"
   ami_id         = "ami-018046b953a698135" # Update with latest Amazon Linux or Ubuntu
   instance_type  = "t2.micro"
   subnet_id      = module.vpc.public_subnet_ids[0]
