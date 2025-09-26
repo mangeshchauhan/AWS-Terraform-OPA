@@ -12,7 +12,7 @@ module "vpc" {
 }
 
 module "sg" {
-  source  = "../../modules/security_groups"
+  source  = "./modules/sg"
   vpc_id  = module.vpc.vpc_id
   sg_name = "wordpress-sg"
 }
