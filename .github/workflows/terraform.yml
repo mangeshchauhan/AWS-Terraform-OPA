@@ -66,12 +66,6 @@ jobs:
       - name: Run OPA Policies
         run: conftest test myplan.json --policy ./opa-policies/
 
-      - name: Await Manual Approval
-        if: success()
-        uses: hmarr/auto-approve-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment: "Terraform apply approved, proceeding..."
 
       - name: Terraform Apply
         if: success()
