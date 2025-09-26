@@ -12,7 +12,7 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ap-south-1  # Change to your region
+      AWS_REGION: ap-south-1
 
     steps:
       - name: Checkout code
@@ -21,35 +21,37 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.7.0  # Specify your desired version
+          terraform_version: 1.12.0  # Use a version that supports -json
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan
+      - name: Terraform Plan (binary)
         run: |
-          terraform plan -out="tfplan" || exit 1
+          terraform plan -out="myplan.tfplan"
+          echo "Terraform plan completed."
 
       - name: Export Plan to JSON
         run: |
-          if terraform show -json tfplan > myplan.json; then
-            echo "myplan.json created."
+          if [ -s tfplan ]; then
+              terraform show -json myplan.tfplan > myplan.json
+              echo "myplan.json created."
           else
-            echo "Terraform plan JSON failed. Creating empty JSON to skip OPA."
-            echo '{}' > myplan.json
+              echo "{}" > myplan.json
+              echo "No changes detected, created empty JSON."
           fi
 
-      - name: Validate Terraform Plan JSON
+      - name: Validate myplan.json
         run: |
           if ! jq empty myplan.json >/dev/null 2>&1; then
-            echo "Error: myplan.json is not valid JSON!"
-            head -10 myplan.json
-            exit 1
+              echo "Error: myplan.json is not valid JSON!"
+              head -10 myplan.json
+              exit 1
           fi
 
-          if [ "$(jq '.resource_changes | length' myplan.json)" -eq 0 ]; then
-            echo "Terraform plan has no resource changes. Skipping OPA and apply."
-            exit 0
+          if [ "$(jq '.resource_changes | length // 0' myplan.json)" -eq 0 ]; then
+              echo "Terraform plan has no resource changes. Skipping OPA and apply."
+              exit 0
           fi
 
           echo "myplan.json is valid and has resource changes."
@@ -64,11 +66,12 @@ jobs:
       - name: Run OPA Policies
         run: conftest test myplan.json --policy ./opa-policies/
 
-      - name: Manual Approval Before Apply
+      - name: Await Manual Approval
+        if: success()
         uses: hmarr/auto-approve-action@v2
         with:
-          comment: "Terraform apply is waiting for manual approval."
-        if: success()  # Only show if OPA policies pass
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment: "Terraform apply approved, proceeding..."
 
       - name: Terraform Apply
         if: success()
