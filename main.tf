@@ -34,7 +34,7 @@ module "ec2" {
   key_name       = "mylinux" # Your EC2 KeyPair
   instance_name  = "wordpress-ec2"
 }
-module "ec2" {
+module "ec2_1" {
   source         = "./modules/ec2"
   ami_id         = "ami-018046b953a698135" # Update with latest Amazon Linux or Ubuntu
   instance_type  = "t2.medium"
