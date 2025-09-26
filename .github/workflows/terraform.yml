@@ -21,10 +21,15 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.12.0  # Use a version that supports -json
+          terraform_version: 1.12.0  # ensure -json support
 
-      - name: Terraform Init
-        run: terraform init
+      - name: Terraform Init with S3 backend
+        run: |
+          terraform init \
+            -backend-config="my-terraform-state-bucket-12345678901234" \
+            -backend-config="key=env/main.tfstate" \
+            -backend-config="region=ap-south-1" \
+            -backend-config="dynamodb_table=terraform-lock-table"
 
       - name: Terraform Plan (binary)
         run: |
@@ -33,13 +38,8 @@ jobs:
 
       - name: Export Plan to JSON
         run: |
-          if [ -s tfplan ]; then
-              terraform show -json myplan.tfplan > myplan.json
-              echo "myplan.json created."
-          else
-              echo "{}" > myplan.json
-              echo "No changes detected, created empty JSON."
-          fi
+          terraform show -json myplan.tfplan > myplan.json
+          echo "myplan.json created."
 
       - name: Validate myplan.json
         run: |
@@ -50,7 +50,7 @@ jobs:
           fi
 
           if [ "$(jq '.resource_changes | length // 0' myplan.json)" -eq 0 ]; then
-              echo "Terraform plan has no resource changes. Skipping OPA and apply."
+              echo "No resource changes. Skipping OPA and apply."
               exit 0
           fi
 
@@ -64,8 +64,14 @@ jobs:
           conftest --version
 
       - name: Run OPA Policies
-        run: conftest test myplan.json --policy ./opa-policies/
+        run: |
+          conftest test myplan.json --policy ./opa-policies/
 
+      - name: Approval before Apply
+        if: success()
+        uses: hmarr/auto-approve-action@v2
+        with:
+          message: "Terraform plan ready. Waiting for manual approval to apply."
 
       - name: Terraform Apply
         if: success()
