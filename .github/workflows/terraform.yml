@@ -13,6 +13,9 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ap-south-1
+      TF_STATE_BUCKET: my-terraform-state-bucket-12345678901234     # S3 bucket name
+      TF_STATE_KEY: terraform.tfstate
+      TF_STATE_DYNAMODB_TABLE: my-terraform-lock     # DynamoDB table for locking
 
     steps:
       - name: Checkout code
@@ -21,27 +24,31 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.12.0  # ensure -json support
+          terraform_version: 1.12.0
 
-      - name: Terraform Init with S3 backend
+      - name: Terraform Init with S3 Backend
         run: |
-          terraform init \
-            -backend-config="my-terraform-state-bucket-12345678901234" \
-            -backend-config="key=env/main.tfstate" \
-            -backend-config="region=ap-south-1" \
-            -backend-config="dynamodb_table=terraform-lock-table"
+          terraform init -backend-config="bucket=$TF_STATE_BUCKET" \
+                         -backend-config="key=$TF_STATE_KEY" \
+                         -backend-config="region=$AWS_REGION" \
+                         -backend-config="dynamodb_table=$TF_STATE_DYNAMODB_TABLE"
 
-      - name: Terraform Plan (binary)
+      - name: Terraform Plan
         run: |
           terraform plan -out="myplan.tfplan"
-          echo "Terraform plan completed."
+          echo "Terraform plan created: myplan.tfplan"
 
       - name: Export Plan to JSON
         run: |
-          terraform show -json myplan.tfplan > myplan.json
-          echo "myplan.json created."
+          if [ ! -s myplan.tfplan ]; then
+              echo "No Terraform plan generated. Creating empty JSON."
+              echo "{}" > myplan.json
+          else
+              terraform show -json myplan.tfplan > myplan.json
+              echo "myplan.json created from Terraform plan."
+          fi
 
-      - name: Validate myplan.json
+      - name: Validate JSON & Check Resource Changes
         run: |
           if ! jq empty myplan.json >/dev/null 2>&1; then
               echo "Error: myplan.json is not valid JSON!"
@@ -50,7 +57,7 @@ jobs:
           fi
 
           if [ "$(jq '.resource_changes | length // 0' myplan.json)" -eq 0 ]; then
-              echo "No resource changes. Skipping OPA and apply."
+              echo "No resource changes detected. Skipping OPA and apply."
               exit 0
           fi
 
@@ -64,13 +71,10 @@ jobs:
           conftest --version
 
       - name: Run OPA Policies
+        run: conftest test myplan.json --policy ./opa-policies/
+
+      - name: Terraform Apply (manual approval required)
+        if: success()
         run: |
-          conftest test myplan.json --policy ./opa-policies/
-
-      - name: Approval before Apply
-        if: success()
-        uses: hmarr/auto-approve-action@v2
-
-      - name: Terraform Apply
-        if: success()
-        run: terraform apply -auto-approve myplan.tfplan
+          echo "Terraform apply will run only after manual approval."
+          echo "Please approve this step in GitHub Actions to continue."
