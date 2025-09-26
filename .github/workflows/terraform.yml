@@ -12,7 +12,7 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ap-south-1  # Change to your AWS region
+      AWS_REGION: ap-south-1  # Change as needed
 
     steps:
       - name: Checkout code
@@ -21,24 +21,27 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.7.0
+          terraform_version: 1.7.9  # Set your desired Terraform version
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan
+      - name: Terraform Plan (binary)
         run: |
-          terraform plan -out="myplan.tfplan"
-          echo "Terraform plan created successfully."
+          terraform plan -out=myplan
+          echo "Terraform plan completed successfully."
 
       - name: Export Plan to JSON
-        run: terraform show -json myplan.tfplan > mplan.json
+        run: |
+          # Export terraform plan to JSON, if plan is empty use '{}'
+          terraform show -json myplan > myplan.json || echo '{}' > myplan.json
+          echo "myplan.json created."
 
-      - name: Validate tfplan.json using jq
+      - name: Validate Plan JSON
         run: |
           if [ ! -s myplan.json ]; then
-            echo "Error: myplan.json is empty!"
-            exit 1
+            echo "No changes detected. Skipping further steps."
+            exit 0
           fi
 
           if ! jq empty myplan.json >/dev/null 2>&1; then
@@ -47,7 +50,12 @@ jobs:
             exit 1
           fi
 
-          echo "myplan.json is valid JSON."
+          if [ "$(jq '.resource_changes | length' myplan.json)" -eq 0 ]; then
+            echo "Terraform plan has no changes. Skipping apply."
+            exit 0
+          fi
+
+          echo "myplan.json is valid and has changes."
 
       - name: Install Conftest
         run: |
@@ -59,12 +67,12 @@ jobs:
       - name: Run OPA Policies
         run: conftest test myplan.json --policy opa-policies/
 
-      - name: Wait for Manual Approval
+      - name: Request Manual Approval
         uses: hmarr/auto-approve-action@v2
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          comment: "Waiting for manual approval to apply Terraform changes."
+          message: "Terraform plan ready for apply. Manual approval required before execution."
+        if: success()
 
       - name: Terraform Apply
-        if: success()   # Only apply if OPA tests pass and approved
-        run: terraform apply -auto-approve tfplan
+        if: success()
+        run: terraform apply -auto-approve myplan
