@@ -26,7 +26,7 @@ jobs:
 
       - name: Terraform Plan
         run: |
-          terraform plan -out=tfplan
+          terraform plan -out="tfplan"
           echo "Terraform plan created successfully."
 
       - name: Export Plan to JSON
