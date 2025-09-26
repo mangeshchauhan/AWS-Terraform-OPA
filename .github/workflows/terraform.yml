@@ -20,8 +20,6 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.7  # Specify your Terraform version
 
       - name: Terraform Init
         run: terraform init
@@ -47,11 +45,13 @@ jobs:
 
       - name: Validate tfplan.json using jq
         run: |
+          # Check if tfplan.json is empty
           if [ ! -s tfplan.json ]; then
             echo "Error: tfplan.json is empty!"
             exit 1
           fi
 
+          # Check if tfplan.json is valid JSON
           if ! jq empty tfplan.json 2>/dev/null; then
             echo "Error: tfplan.json is not valid JSON!"
             head -10 tfplan.json
@@ -71,5 +71,5 @@ jobs:
         run: conftest test tfplan.json --policy opa-policies/
 
       - name: Terraform Apply
-        if: success()  # Only apply if OPA tests pass
+        if: success()   # Only apply if OPA tests pass
         run: terraform apply -auto-approve tfplan
