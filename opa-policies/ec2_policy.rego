@@ -5,7 +5,7 @@ deny[msg] {
     required_tags := {"Name", "Environment", "Department"}
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
-    resource.change.actions[_] != "delete"
+    not "delete" in resource.change.actions
 
     tag := required_tags[_]
     not resource.change.after.tags[tag]
@@ -16,11 +16,24 @@ deny[msg] {
 deny[msg] {
     resource := input.resource_changes[_]
     resource.type == "aws_instance"
-    resource.change.actions[_] == "update"
+    "update" in resource.change.actions
 
     before := resource.change.before.instance_type
     after := resource.change.after.instance_type
 
     before != after
     msg := sprintf("EC2 %s instance type is being changed from %s to %s", [resource.address, before, after])
+}
+
+# Deny if instance is being replaced
+deny[msg] {
+    resource := input.resource_changes[_]
+    resource.type == "aws_instance"
+    "replace" in resource.change.actions
+
+    before := resource.change.before.instance_type
+    after := resource.change.after.instance_type
+
+    before != after
+    msg := sprintf("EC2 %s is being replaced: instance type %s -> %s", [resource.address, before, after])
 }
