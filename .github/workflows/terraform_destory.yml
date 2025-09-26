@@ -30,12 +30,12 @@ jobs:
 
       - name: Terraform Plan Destroy
         run: |
-          terraform plan -destroy -out=destroy.tfplan
+          terraform plan -destroy -out=tfplan.binary
           echo "Terraform destroy plan created."
 
       - name: Validate destroy plan
         run: |
-          terraform show -json destroy.tfplan > destroy.json
+          terraform show -json tfplan.binary > destroy.json
           if ! jq empty destroy.json >/dev/null 2>&1; then
             echo "Error: destroy plan JSON is invalid!"
             head -10 destroy.json
@@ -43,10 +43,7 @@ jobs:
           fi
           echo "Destroy plan is valid JSON."
 
-      - name: Approval before destroy
-        uses: hmarr/auto-approve-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve destroy.tfplan
