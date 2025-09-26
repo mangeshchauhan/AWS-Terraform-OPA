@@ -28,7 +28,7 @@ module "sg" {
 module "ec2" {
   source         = "./modules/ec2"
   ami_id         = "ami-018046b953a698135" # Update with latest Amazon Linux or Ubuntu
-  instance_type  = "t2.large"
+  instance_type  = "t2.medium"
   subnet_id      = module.vpc.public_subnet_ids[0]
   sg_id          = module.sg.security_group_id
   key_name       = "mylinux" # Your EC2 KeyPair
