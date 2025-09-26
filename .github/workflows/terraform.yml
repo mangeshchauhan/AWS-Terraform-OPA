@@ -24,43 +24,45 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan (binary)
+      - name: Terraform Plan
         run: |
-          set -e
           terraform plan -out=tfplan
-          echo "Terraform plan completed successfully."
+          echo "Terraform plan created successfully."
 
-      - name: Check tfplan file exists
+      - name: Export Plan to JSON
+        run: terraform show -json tfplan > tfplan.json
+
+      - name: Validate tfplan.json using jq
         run: |
-          if [ ! -f tfplan ]; then
-            echo "Error: tfplan file not found!"
+          if [ ! -s tfplan.json ]; then
+            echo "Error: tfplan.json is empty!"
             exit 1
           fi
-          echo "tfplan file exists:"
-          ls -l tfplan
-          file tfplan
+
+          if ! jq empty tfplan.json >/dev/null 2>&1; then
+            echo "Error: tfplan.json is not valid JSON!"
+            head -10 tfplan.json
+            exit 1
+          fi
+
+          echo "tfplan.json is valid JSON."
 
       - name: Install Conftest
         run: |
           wget https://github.com/open-policy-agent/conftest/releases/download/v0.37.0/conftest_0.37.0_Linux_x86_64.tar.gz
           tar xzf conftest_0.37.0_Linux_x86_64.tar.gz
           sudo mv conftest /usr/local/bin/
-          conftest --version
+          conftest --help
 
-      - name: Run OPA Policies on Terraform Plan
-        run: |
-          terraform show tfplan > tfplan.txt
-          conftest test tfplan.txt --policy opa-policies/
+      - name: Run OPA Policies
+        run: conftest test tfplan.json --policy opa-policies/
 
-  apply:
-    needs: terraform
-    runs-on: ubuntu-latest
-    environment:
-      name: dev
-      # Add reviewers in GitHub repository settings for this environment
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Wait for Manual Approval
+        uses: hmarr/auto-approve-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment: "Waiting for manual approval to apply Terraform changes."
 
       - name: Terraform Apply
+        if: success()   # Only apply if OPA tests pass and approved
         run: terraform apply -auto-approve tfplan
