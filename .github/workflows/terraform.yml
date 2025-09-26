@@ -9,10 +9,9 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
 
-    env:   # AWS credentials + region
+    env: 
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: us-east-1   # change if needed
 
     steps:
       - name: Checkout code
@@ -25,13 +24,28 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan (binary)
-        run: terraform plan -out=tfplan   # Save binary plan
+        run: |
+          set -e
+          terraform plan -out=tfplan
+
+      - name: Check tfplan file exists
+        run: |
+          if [ ! -f tfplan ]; then
+            echo "Error: tfplan file not found!"
+            exit 1
+          fi
+          ls -l tfplan
+          file tfplan
 
       - name: Export Plan JSON
-        run: terraform show -json tfplan > tfplan.json   # Convert binary plan to JSON
+        run: terraform show -json tfplan > tfplan.json
 
       - name: Debug tfplan.json
-        run: head -10 tfplan.json   # Optional: check first lines of JSON
+        run: |
+          echo "First 10 lines of tfplan.json:"
+          head -10 tfplan.json
+          echo "Checking if first character is '{'"
+          head -c 1 tfplan.json
 
       - name: Install Conftest
         run: |
@@ -43,5 +57,5 @@ jobs:
         run: conftest test tfplan.json --policy opa-policies/
 
       - name: Terraform Apply
-        if: success()   # Only apply if Conftest passes
+        if: success()
         run: terraform apply -auto-approve tfplan
