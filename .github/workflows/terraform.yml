@@ -61,12 +61,8 @@ jobs:
 
       - name: Run OPA Policies
         run: conftest test myplan.json --policy ./opa-policies/
-
-      - name: Manual Approval
-        uses: hmarr/auto-approve-action@v2
-        if: success()
        
 
       - name: Terraform Apply
         if: success()
-        run: terraform apply -auto-approve myplan.tfplan
+        run: terraform apply -auto-approve tfplan.binary
