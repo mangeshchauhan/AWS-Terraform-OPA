@@ -31,6 +31,6 @@ module "ec2" {
   instance_type  = "t2.micro"
   subnet_id      = module.vpc.public_subnet_ids[0]
   sg_id          = module.sg.security_group_id
-  key_name       = "ec2" # Your EC2 KeyPair
+  key_name       = "mylinux" # Your EC2 KeyPair
   instance_name  = "wordpress-ec2"
 }
