@@ -60,7 +60,7 @@ jobs:
           conftest --version
 
       - name: Run OPA Policies
-        run: conftest test myplan.json --policy opa-policies/
+        run: conftest test myplan.json --policy ./opa-policies/
        
 
       - name: Terraform Apply
