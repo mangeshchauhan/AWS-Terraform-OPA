@@ -66,7 +66,7 @@ jobs:
           conftest --help
 
       - name: Run OPA Policies
-        run: conftest test myplan.json --policy ./opa-policies/
+        run: conftest test myplan.json --policy opa-policies/*
 
       - name: Await Manual Approval
         uses: hmarr/auto-approve-action@v2
